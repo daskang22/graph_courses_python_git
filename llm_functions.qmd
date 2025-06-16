@@ -1,0 +1,197 @@
+
+# Imports
+
+```{python}
+# run this on terminal to bypass SSL issue
+
+# python3 -m pip install openai --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host files.pythonhosted.org
+
+```
+
+```{python}
+
+from openai import OpenAI
+import pandas as pd
+import numpy as np
+from local_settings import OPENAI_KEY
+
+
+```
+
+# Setting Up the OpenAI Client
+
+```{python}
+client = OpenAI(api_key=OPENAI_KEY)
+```
+
+# Making our first call
+
+```{python}
+response = client.chat.completions.create(
+    model="gpt-4o-mini", 
+    messages=[{"role": "user", "content": "What is the most tourist-friendly city in France?"}]
+)
+print(response.choices[0].message.content)
+```
+
+# Defining Helper Functions
+
+
+```{python}
+def llm_chat(message):
+    response = client.chat.completions.create(
+        model="gpt-4o-mini", messages=[{"role": "user", "content": message}]
+    )
+    return response.choices[0].message.content
+```
+
+
+```{python}
+llm_chat("Tell me why Python is an awesome language")
+```
+
+# Practice Q: Get tourist-friendly city in Brazil
+
+Use the llm_chat function to ask the model for the most tourist-friendly city in Brazil. Store the response in a variable called rec_brazil. Print the response.
+
+
+```{python}
+rec_brazil = llm_chat("What is the most tourist-friendly city in Brazil")
+```
+
+# Variables as Prompt Inputs
+
+
+```{python}
+def city_rec(country):
+    prompt = f"What is the most tourist-friendly city in {country}?"
+    return llm_chat(prompt)
+
+city_rec_vec = np.vectorize(city_rec)
+```
+
+
+```{python}
+city_rec("Nigeria")
+```
+
+
+```{python}
+country_df = pd.DataFrame({"country": ["Nigeria", "Chile", "France", "Canada"]})
+```
+
+
+```{python}
+# using the vectorized function on a dataframe
+
+country_df["city_rec"] = city_rec_vec(country_df["country"])
+country_df
+```
+
+# Practice Q: Get local dishes
+
+Create a function called get_local_dishes that takes a country name as input and returns some of the most famous local dishes from that country. Then, vectorize this function and apply it to the country_df DataFrame to add a column with local dish recommendations for each country.
+
+
+```{python}
+def local_dish(country):
+    prompt = f"What is the most famous local dish in {country}?"
+    return llm_chat(prompt)
+
+local_dish_vec = np.vectorize(local_dish)
+
+country_df["local_dish_rec"] = local_dish_vec(country_df["country"])
+
+
+country_df
+```
+
+# Automated Summary: Movies Dataset
+
+
+```{python}
+import pandas as pd
+import vega_datasets as vd
+
+# Load the movies dataset
+movies = vd.data.movies().head()  # Using only the first 5 rows to conserve API credits
+movies
+```
+
+
+```{python}
+# Convert each movie's data into a dictionary
+movies.to_dict(orient="records")
+```
+
+
+```{python}
+# store the dict as a column in the dataset
+movies["full_dict"] = movies.to_dict(orient="records")
+movies
+```
+
+
+```{python}
+def movie_performance(movie_data):
+    prompt = f"Considering the following data on this movie {movie_data}, provide a one-paragraph summary of its performance for my report."
+
+    return llm_chat(prompt)
+```
+
+
+```{python}
+import numpy as np
+
+# Vectorize the function to apply it to the DataFrame
+
+movie_performance_vec = np.vectorize(movie_performance)
+```
+
+
+```{python}
+# Generate summaries for each movie
+movies["llm_summary"] = movie_performance_vec(movies["full_dict"])
+```
+
+
+```{python}
+# Save the results to a CSV file
+movies.to_csv("movies_output.csv", index=False)
+```
+
+
+
+
+# Practice Q: Weather Summary
+
+Using the first 5 rows of the seattle_weather dataset from vega_datasets, create a function that takes all weather columns for a particular day and generates a summary of the weather conditions for that day. The function should use the LLM to generate a one-paragraph summary for a report, considering the data provided. Store the results in a column called weather_summary.
+
+
+```{python}
+weather = vd.data.seattle_weather().head()
+weather
+```
+
+
+```{python}
+weather["full_dict"] = weather.to_dict(orient="records")
+```
+
+
+```{python}
+def weather_sum(weather_data):
+    prompt = f"Considering the following data on this day {weather_data}, provide a one-paragraph summary of the weather conditions for my report."
+
+    return llm_chat(prompt)
+
+weather_sum_vec = np.vectorize(weather_sum)
+
+```
+
+
+```{python}
+weather["weather_summary"] = weather_sum_vec(weather["full_dict"])
+
+weather
+```

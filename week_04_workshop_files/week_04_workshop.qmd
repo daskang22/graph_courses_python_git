@@ -1,0 +1,97 @@
+
+---
+title: "India TB Pathways Analysis"
+format : html
+author : Angeliki Daskalopoulou
+execute: 
+      echo: false
+---
+
+```{python}
+import pandas as pd
+import plotly.express as px
+import itables as it
+
+
+```
+
+# India TB Pathways Dataset 
+
+The India TB Pathways dataset is based on a study conducted in Vellore district, Tamil Nadu, India. It
+examines the pre-diagnostic costs and health-seeking behavior of 880 new adult pulmonary tuberculosis
+patients registered at Primary Health Centres (PHCs).
+
+Please see below the first 5 rows of the dataset
+
+```{python}
+# Read the CSV file
+india_tb_data = pd.read_csv("/Users/adask/Documents/graph_courses_workspace/data/india_tb_pathways_and_costs.csv")
+
+# View the data
+from itables import show
+
+
+show(india_tb_data.head())
+```
+
+
+## The map of the Tamil Nadu state in India
+
+![Vellore district is in the north-east.](data/tndistrict_1.png)
+
+
+# Visualisation 
+
+
+We have an unbalanced dataset with the majority of the patients being male
+
+```{python}
+fig1 = px.histogram(india_tb_data, title="No of patients per Sex", x='Sex', text_auto= True)
+
+fig1
+```
+
+
+We see that overall the female population is of younger age compared to the male. The median of males is at 50y while for women is at 40y.
+
+
+
+```{python}
+fig2 = px.violin(india_tb_data,title="Age distribution per Sex", y="Age", x="Sex", box=True, color="Sex")
+
+fig2
+```
+
+
+Looking into the TB results from the initial smear test, we do not see a big difference between sexes. Men have slightly higher % of positive cases. We chose the % since our dataset is imbalanced.
+
+
+
+
+```{python}
+fig3 = px.histogram(
+    india_tb_data,
+    title="% of TB result per sex group",
+    x="Sex",
+    color="Form of TB", 
+    barnorm="percent",
+    text_auto=".1f")
+
+fig3
+```
+
+
+
+
+# Some info
+
+
+```{python}
+max_age = int(india_tb_data.Age.max())
+min_age  = int(india_tb_data.Age.min())
+
+```
+
+
+The oldest patient is `{python} max_age` years old, while the youngest is `{python} min_age` years old
+

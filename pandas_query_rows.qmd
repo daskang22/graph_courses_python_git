@@ -1,0 +1,264 @@
+# Imports
+
+
+```{python}
+ import pandas as pd
+```
+
+# Dataset
+
+```{python}
+yaounde = pd.read_csv("data/yaounde_data.csv")
+
+yaounde
+```
+
+
+```{python}
+yao = yaounde[
+    [
+        "age",
+        "sex",
+        "weight_kg",
+        "neighborhood",
+        "occupation",
+        "symptoms",
+        "is_smoker",
+        "is_pregnant",
+        "igg_result",
+        "igm_result",
+    ]
+]
+yao.head()
+
+```
+
+# Introduce query
+
+```{python}
+yao.query('sex == "Male"')
+
+yao.query('sex == "Male"').shape
+```
+
+```{python}
+# numbers of rows and columns with shape attribute
+yao.query('sex == "Male"').shape
+```
+
+```{python}
+#get the nb of rows that fullfil the #criteria(python is zero indexed)
+
+yao.query('sex == "Male"').shape[0]
+```
+
+
+```{python}
+#queries do not modify the dataset
+#you need to create a new object/variable
+
+
+```
+
+# Practice Question : Subset for Pregnant Respondents
+
+The is_pregnant column contains “Yes”, “No” or NaN. Assign the result to a new DataFrame called yao_pregnant. Then print this new DataFrame. There should be 24 rows.
+
+```{python}
+yao_pregnant = yao.query('is_pregnant == "Yes"')
+
+yao_pregnant.shape[0]
+```
+
+# Relational Operators
+
+
+```{python}
+yao.query('sex == "Male"')  # equal to
+yao.query('sex != "Male"')  # not equal to
+yao.query("age > 7")  # greater than
+yao.query("age >= 70")  # greater than or equal to
+yao.query("age < 7")  # less than
+yao.query("age <= 7")  # less than or equal to
+
+# is in
+yao.query('neighborhood.isin(["Briqueterie", "Carriere"])')
+```
+
+
+# Practice Q: Subset for Children
+
+From yao, keep only respondents who were children (under 18). Assign the result to a new DataFrame called yao_children. There should be 291 rows.
+
+
+```{python}
+yao_children = yao.query("age < 18")  # less than
+yao_children
+```
+
+With isin() keep only respondents who live in the “Carriere” or “Ekoudou” neighborhoods. Assign the result to a new DataFrame called yao_carriere_ekoudou. There should be 426 rows.
+
+
+```{python}
+yao_carriere_ekoudou = yao.query('neighborhood.isin(["Ekoudou", "Carriere"])')
+
+yao_carriere_ekoudou
+```
+
+# Accessing external variables
+
+
+```{python}
+min_age = 25
+
+yao.query("age>= @min_age")
+```
+
+# Practice Q : subset for young respondents
+
+From yao, keep respondents who are less than or equal to the variable max_age, defined below. Assign the result to a new DataFrame called yao_young. There should be 590 rows.
+
+
+```{python}
+max_age = 30
+# Your code here
+yao_young = yao.query("age<=@max_age")
+yao_young
+
+```
+
+# Combining conditions 
+
+
+```{python}
+#age less than 18 or over 65
+yao.query("age < 18 | age > 65")
+```
+
+
+```{python}
+#pregnant and an ex-smoker
+yao.query('is_pregnant == "Yes" & is_smoker == "Ex-smoker"')
+```
+
+
+```{python}
+#get unique values in columns
+yao.is_smoker.value_counts()
+```
+
+# Practice Q: Subset for IgG Positive Men
+
+Subset yao to only keep men who tested IgG positive. Assign the result to a new DataFrame called yao_igg_positive_men. There should be 148 rows after your query.
+
+
+```{python}
+
+yao_igg_positive_men = yao.query('sex == "Male" & igg_result == "Positive"')
+
+yao_igg_positive_men
+
+```
+
+# Negating conditions with the ~ operator
+
+To negate conditions in query(), we use the ~ operator (pronounced “tilde”).
+
+
+```{python}
+#return individuals who do not fulfil the condition
+
+yao.query(' ~  (occupation == "Student")')
+
+
+```
+
+
+```{python}
+#equivalent to
+yao.query('(occupation != "Student")')
+
+```
+
+
+```{python}
+yao.query(" ~ (age < 18 | weight_kg < 30)")
+```
+
+# Practice Q: Drop Smokers and drop those over 50
+
+We want to avoid giving a drug to older individuals and smokers. From yao, drop respondents that are either above 50 or who are smokers. Use ~ to negate the conditions. Assign the result to a new DataFrame called yao_dropped. Your output should have 810 rows.
+
+
+```{python}
+yao_dropped = yao.query(
+'~(age > 50 | is_smoker == "Smoker")')
+
+yao_dropped
+```
+
+# NaN values
+
+NA are missing values 
+
+
+```{python}
+yao.query("is_pregnant == NaN")  # does not work
+```
+
+
+```{python}
+yao.query("is_pregnant.isna()")
+```
+
+
+```{python}
+yao.query("is_pregnant.notna()")
+```
+
+# Practice Q: Keep Missing Smoking Status
+
+From the yao dataset, keep all the respondents who had NA records for the report of their smoking status.
+
+
+```{python}
+yao.query("is_smoker.isna()")
+```
+
+# Querying Based on String Patterns
+
+
+```{python}
+yao.occupation.value_counts()
+```
+
+
+```{python}
+# contains word /string student
+yao.query("occupation.str.contains('Student')")
+```
+
+
+```{python}
+# does not contain word /string student
+
+yao.query(" ~ (occupation.str.contains('Student'))")
+```
+
+
+```{python}
+# contains student or farmer values
+
+yao.query("occupation.str.contains('Student|Farmer')")
+```
+
+# Practice Q: Symptoms
+
+The symptoms column contains a list of symptoms that respondents reported.
+
+Query yao to find respondents who reported “Cough” or “Fever” as symptoms. Your answer should have 219 rows.
+
+
+```{python}
+yao.query("symptoms.str.contains('Cough|Fever')")
+```
