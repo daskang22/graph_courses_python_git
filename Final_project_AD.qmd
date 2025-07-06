@@ -2,7 +2,7 @@
 title: "GAPMINDER FINAL PROJECT"  
 author: "Angeliki Daskalopoulou"
 format: 
-    dashboard:
+    dashboard:f
         logo: images/gapminder_logo
         theme: [yeti, custom.scss]
 
