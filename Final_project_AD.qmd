@@ -1,0 +1,591 @@
+---
+title: "GAPMINDER FINAL PROJECT"  
+author: "Angeliki Daskalopoulou"
+format: 
+    dashboard:
+        logo: images/gapminder_logo
+        theme: [yeti, custom.scss]
+
+---
+
+
+```{python}
+# imports
+
+import pandas as pd
+import numpy as np
+import plotly.express as px
+import seaborn as sns
+import matplotlib.pyplot as plt
+import country_converter as cc
+import plotly.graph_objects as go
+import itables 
+
+```
+
+
+```{python}
+# Load initial csvs
+
+lex=pd.read_csv("data/gm/lex.csv")
+
+
+gdp_pcap=pd.read_csv("data/gm/gdp_pcap.csv")
+
+# create year as column
+
+lex_long=lex.melt(
+    id_vars=['country'],
+    var_name='year',
+    value_name='life_expectancy'
+    )
+
+
+
+gdp_pcap_long=gdp_pcap.melt(
+    id_vars=['country'],
+    var_name='year',
+    value_name='GDP_per_capita'
+    )
+
+#lex_long['country'].value_counts() #196 rows
+#gdp_pcap_long['country'].value_counts() #196 rows
+
+# combine 2 csvs with no data loss
+
+df=pd.merge(lex_long,gdp_pcap_long,how='outer',on=["country", "year"])
+
+```
+
+
+```{python}
+# create variable continent 
+
+# Converting country names to ISO 3    
+
+# replace the UAE value that returned error
+df = df.replace(
+    {"UAE": "United Arab Emirates"}
+)
+
+
+df["iso_alpha"] = cc.convert(names = df["country"], to='ISO3')
+
+#convert country iso code to continent
+
+df["continent"] = cc.convert(names = df["country"], to='Continent') 
+
+
+```
+
+
+
+```{python}
+# create variable century
+
+# convert year to int
+
+df["year"] = df["year"].astype(int)
+
+
+# function to convert year to century
+def year_to_century(year):
+    return (year - 1) // 100 + 1
+
+
+year_to_century = np.vectorize(year_to_century)
+
+
+df["century"] = year_to_century(df["year"])
+
+# add ordinal suffix
+
+# function for suffix
+
+
+def add_suffix(n):
+    if 10 <= n % 100 <= 20:
+        suffix = "th"
+    else:
+        suffix = {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+    return f"{n}{suffix}"
+
+
+add_suffix = np.vectorize(add_suffix)
+
+df["century"] = add_suffix(df["century"])
+
+```
+
+
+```{python}
+
+#check for missing values
+
+#df['GDP_per_capita'].isna().sum()--> 301
+
+#df[df['GDP_per_capita'].isna()]-->Lichtenstein 
+
+#df['life_expectancy'].isna().sum()-->1500
+
+missing_countries=df[df['life_expectancy'].isna()]
+
+drop_countries=missing_countries['country'].unique()
+
+```
+
+
+```{python}
+#remove countries with missing values
+df_clean = df[~df['country'].isin(drop_countries)]
+
+```
+
+
+
+```{python}
+# check if df has correct data types
+# print(df_clean.dtypes)
+
+# unify gdp values & assign int type
+
+df_clean['GDP_per_capita'] = df_clean['GDP_per_capita'].astype(str)
+
+
+def convert_k(value):
+    value = value.strip().lower()
+    if value.endswith('k'):
+        return float(value[:-1]) * 1000
+    else:
+        return float(value)
+
+convert_k=np.vectorize(convert_k)
+
+
+
+df_clean['GDP_per_capita'] = convert_k(df_clean['GDP_per_capita'])
+
+#print(df_clean.dtypes)
+
+```
+
+
+
+# General Info
+
+::: {.card title="About Gapminder"}
+[Gapminder Foundation](https://www.gapminder.org) is a non-profit venture registered in Stockholm, Sweden, that promotes sustainable global development and achievement of the United Nations Millennium Development Goals by increased use and understanding of statistics and other information about social, economic, and environmental development at local, national, and global levels.
+
+Gapminder was founded in 2005 by Ola Rosling, Anna Rosling Rönnlund, and Hans Rosling. The name Gapminder was derived from the "Mind the Gap" warning messages on the London Underground.^[[Wikipedia](https://en.wikipedia.org/wiki/Gapminder_Foundation)]
+
+Gapminder is famous for their datasets which are free to use. They collect several indicators across multiple countries and for long time periods allowing for some data exploration.
+
+In the scope of this project only two indicators are selected for further analysis:
+
+
+* ***GDP per capita***:  Gross domestic product per person adjusted for differences in purchasing power (in international dollars, fixed 2017 prices, PPP based on 2017 ICP).
+
+
+* ***Life expectancy, at birth***:  The number of years a newborn infant would live if the current mortality rates at different ages were to stay the same throughout its life.
+
+
+
+Learn more about the Gapminder dataset at <https://www.gapminder.org/data/documentation/>
+::: 
+
+## Final Dataset Preview {height="70%"}
+
+
+```{python}
+
+# | title: Final Dataset Preview
+
+from itables import show
+import itables.options as opt
+
+# Set global display options
+opt.lengthMenu = [10, 25, 50, 100]
+opt.pageLength = 10
+
+# Display the table
+show(df_clean, caption="Gapminder Dataset Merged")
+```
+
+# GDP per capita
+
+## Row 1 {.tabset}
+
+
+```{python}
+# | title: GDP per Capita Map throughout time 
+
+# interactive cloropleth
+
+# sort years for consistent slider order
+years = sorted(df_clean["year"].unique())
+
+# create one trace per year
+
+data = []
+for year in years:
+    df_year = df_clean[df_clean["year"] == year]
+    choropleth = go.Choropleth(
+        locations=df_year["iso_alpha"],
+        z=df_year["GDP_per_capita"],
+        text=df_year["country"],
+        colorscale="Blues",
+        autocolorscale=True,
+        reversescale=False,
+        marker_line_color="darkgray",
+        marker_line_width=0.5,
+        colorbar_tickprefix="$",
+        colorbar_title="GDP<br>per capita",
+        visible=(year == years[0]),  # Only first year visible initially
+    )
+    data.append(choropleth)
+
+# Create slider steps
+steps = []
+for i, year in enumerate(years):
+    step = dict(
+        method="update",
+        args=[
+            {"visible": [j == i for j in range(len(years))]},
+            {"title": f"Global GDP per Capita - {year}"},
+        ],
+        label=str(year),
+    )
+    steps.append(step)
+
+# Define sliders
+sliders = [
+    dict(active=0, currentvalue={"prefix": "Year: "}, pad={"t": 50}, steps=steps)
+]
+
+# Create figure
+fig_1 = go.Figure(data=data)
+
+fig_1.update_layout(
+    title_text=f"Global GDP per Capita - {years[0]}",
+    geo=dict(showframe=False, showcoastlines=False, projection_type="equirectangular"),
+    sliders=sliders,
+)
+
+```
+
+
+
+
+
+```{python}
+# | title: How does GDP per capita vary across continents for a given year?
+
+
+# Get unique years and continents
+years = sorted(df_clean["year"].unique())
+continents = sorted(df_clean["continent"].dropna().unique())
+
+# Assign a pastel color to each continent
+pastel_colors = px.colors.qualitative.Pastel
+continent_colors = {
+    continent: pastel_colors[i % len(pastel_colors)]
+    for i, continent in enumerate(continents)
+}
+
+# Create one trace per continent per year
+data = []
+visibility_map = []  # Track which traces belong to which year
+
+for year in years:
+    year_visibility = []
+    for continent in continents:
+        df_filtered = df_clean[
+            (df_clean["year"] == year) & (df_clean["continent"] == continent)
+        ]
+        trace = go.Violin(
+            x=df_filtered["GDP_per_capita"],
+            y=df_filtered["continent"],
+            text=df_filtered["country"],
+            hoverinfo="text+x+y",
+            box_visible=True,
+            meanline_visible=True,
+            line_color=continent_colors[continent],
+            name=continent,
+            visible=(year == years[0]),  # Only show first year initially
+            orientation="h",
+            points="all",
+            legendgroup=continent,
+            showlegend=False,  # Show legend only for first year
+        )
+        data.append(trace)
+        year_visibility.append(True if year == years[0] else False)
+    visibility_map.append(year_visibility)
+
+# Create dropdown buttons for each year
+dropdown_buttons = []
+for i, year in enumerate(years):
+    visibility = [val for sublist in visibility_map for val in sublist]
+    # Set visibility for current year
+    for j in range(len(visibility)):
+        visibility[j] = (j // len(continents)) == i
+    button = dict(
+        label=str(year),
+        method="update",
+        args=[
+            {"visible": visibility},
+            {"title": f"GDP per Capita Distribution by Continent ({year})"},
+        ],
+    )
+    dropdown_buttons.append(button)
+
+# Create the figure
+fig_2 = go.Figure(data=data)
+
+fig_2.update_layout(
+    title=f"GDP per Capita Distribution by Continent ({years[0]})",
+    xaxis_title="GDP per Capita (USD)",
+    yaxis_title="Continent",
+    updatemenus=[
+        dict(
+            buttons=dropdown_buttons,
+            direction="down",
+            showactive=True,
+            x=0.5,
+            xanchor="center",
+            y=1.15,
+            yanchor="top",
+        )
+    ],
+    height=600,
+)
+
+
+```
+
+
+
+::: {.card title="Insights"}
+* A rather obvious insight is that GDP over time is increasing. This indicates an economic growth which almost all countries have seen in the span of 2 centuries. Consequently this indicates improved living standards compared to the past. 
+
+
+* What is interesting is the fact that global events such as the World Wars, do not necessarily affect all countries or even continents the same. 
+
+* In fact, the economic impact varied dramatically depending on the country’s role in the war, its geography, and its level of destruction or mobilization.
+
+    + European nations like France, the Soviet Union, and Germany experienced sharp GDP declines, especially during years of invasion, occupation, or heavy bombing.
+
+    + The United States is a major exception: its GDP grew significantly during the war due to massive industrial mobilization, military production, and full employment.
+
+    + Neutral or less-affected countries (like Switzerland or Sweden) often maintained or modestly grew their economies.
+:::
+
+# Life expectancy
+
+## Row 1 {.tabset}
+
+```{python}
+# | title: Life Expectancy Over Time by Country
+
+# Get unique countries
+countries = sorted(df_clean['country'].unique())
+
+# Create one trace per country
+data = []
+visibility_map = []
+
+for i, country in enumerate(countries):
+    df_country = df_clean[df_clean['country'] == country]
+    trace = go.Scatter(
+        x=df_country['year'],
+        y=df_country['life_expectancy'],
+        mode='lines+markers',
+        name=country,
+        visible=(i == 0)  # Only show the first country initially
+    )
+    data.append(trace)
+    visibility_map.append([j == i for j in range(len(countries))])
+
+# Create dropdown buttons
+dropdown_buttons = [
+    dict(
+        label=country,
+        method='update',
+        args=[
+            {'visible': visibility_map[i]},
+            {'title': f"Life Expectancy Over Time: {country}"}
+        ]
+    )
+    for i, country in enumerate(countries)
+]
+
+# Create the figure
+fig_3 = go.Figure(data=data)
+
+fig_3.update_layout(
+    title=f"Life Expectancy Over Time: {countries[0]}",
+    xaxis_title="Year",
+    yaxis_title="Life Expectancy (Years)",
+    updatemenus=[dict(
+        buttons=dropdown_buttons,
+        direction="down",
+        showactive=True,
+        x=0.5,
+        xanchor="center",
+        y=1.15,
+        yanchor="top"
+    )],
+    height=500
+)
+
+
+```
+
+
+```{python}
+# | title: Highest life Expectancy per century
+
+# For each century, find the row with the highest life expectancy
+highest_life_exp = df_clean.loc[df.groupby("century")["life_expectancy"].idxmax()]
+
+fig_4 = px.bar(
+    highest_life_exp,
+    x="century",
+    y="life_expectancy",
+    color="country",
+    text="country",
+    title="Countries with Highest Life Expectancy per Century",
+).update_layout(
+    yaxis_title="Life Expectancy (Years)", xaxis_title="Century", margin=dict(b=100)
+)
+
+
+fig_4.update_traces(textposition="outside")
+
+
+itables.show(highest_life_exp)
+
+
+
+```
+
+```{python}
+# | title: Lowest life Expectancy per century
+
+# For each century, find the row with the lowest life expectancy
+lowest_life_exp = df_clean.loc[df.groupby("century")["life_expectancy"].idxmin()]
+
+fig_5 = px.bar(
+    lowest_life_exp,
+    x="century",
+    y="life_expectancy",
+    color="country",
+    text="country",
+    title="Country with Lowest Life Expectancy per Century",
+).update_layout(
+    yaxis_title="Life Expectancy (Years)", xaxis_title="Century", margin=dict(b=100)
+)
+
+fig_5.update_traces(textposition="outside")
+
+itables.show(lowest_life_exp)
+
+```
+
+
+
+::: {.card title="Insights"}
+
+* Similar to GDP, Life expectancy is on a positive trend for most of the world. This is thanks to a complex interplay of scientific, social, and economic advancements. Vaccines, antibiotics, sanitation systems, waste disposal systems, better nutrition, education etc. However,some regions (especially sub-Saharan Africa) still face challenges from HIV/AIDS, malaria, conflict, and healthcare access.
+
+* Wars also have a direct impact on the life expectancy , as can be seen via the interactive plot
+
+* As for the highest it is not surprise that we have Japan and it is interesting to note the prediction for the 21st century for Singapore.
+
+* Equally for lowest of the century we have Fiji & Samoa with less than 2 years. These are clearly outliers mostly impacted by epidemics or wars. 
+
+    + The 1918 value for Samoa (1.13 years) might be real — that year coincides with the global Spanish flu pandemic, which devastated some Pacific islands.
+
+    + But even in extreme cases, a national average life expectancy of 1 year is highly unlikely — it may reflect a misinterpreted statistic (e.g., infant mortality or a partial population).
+
+    + For Hong Kong the value zero begins from the year 2020. Just the year before the recorded life expectancy was 85.3 years. Therefore we consider this a missing value. It could be related with COVID as it is the same year and after that the data is 0.
+
+::: 
+
+# GDP per capita & Life expectancy in Europe 
+
+## Row 1 
+
+```{python}
+
+# subset df
+df_eu = df_clean[df_clean["continent"] == "Europe"]
+df_eu_25 = df_eu[(df_eu["year"] >= 2000) & (df_eu["year"] <= 2020)]
+
+# get numbers for boxes
+num_countries = df_eu["country"].nunique()
+avg_life_exp = int(round(df_eu["life_expectancy"].mean(), 0))
+avg_gdp = int(round(df_eu["GDP_per_capita"].mean(), 0))
+
+
+```
+
+
+::: {.valuebox icon="globe" color="#1E90FF" title="Countries"}
+
+`{python} num_countries`
+
+:::
+
+::: {.valuebox icon="clock" color="#4682B4" title="Time Period"}
+
+2000–2020
+
+:::
+
+::: {.valuebox icon="heart" color="#87CEFA" title="Avg Life Expectancy"}
+
+`{python} str(avg_life_exp)`
+
+:::
+
+::: {.valuebox icon="coin" color="#aad0f0" title="Avg GDP per Capita"}
+
+`{python} str(avg_gdp)`
+:::
+
+## Row 2 {.tabset}
+
+
+```{python}
+# | title:  GDP vs Life Expectancy
+
+fig_6 = px.scatter(
+    df_eu_25,
+    x="GDP_per_capita",
+    y="life_expectancy",
+    color="country",
+    animation_frame="year",
+    title="GDP per Capita vs Life Expectancy (Europe, 2000–2020)",
+    labels={
+        "GDP_per_capita": "GDP per Capita (USD)",
+        "life_expectancy": "Life Expectancy (Years)",
+    },
+)
+fig_6.update_layout(height=600)
+
+```
+
+::: {.card title="Insights"}
+
+* GDP & Life expectancy are positively correlated. 
+
+* In Europe between 2000 and 2020, countries with higher GDP per capita consistently show higher life expectancy. However, the relationship is not perfectly linear; some countries achieve high life expectancy with moderate GDP, suggesting that healthcare systems, education, and social policies also play a critical role.
+
+* It is worth drawing attention to the decrease of GDP during the years 2008–2010. This period marks the aftermath of the global financial crisis, which severely impacted many European economies. Countries like Greece, Spain, Portugal, and Ireland faced deep recessions, rising unemployment, and austerity measures. The decline in GDP during these years reflects the widespread contraction in economic activity across the continent.
+
+* However, it was not the same for Life expectancy. Life expectancy growth stagnated or slowed down, but didn’t reverse. This was linked to austerity measures, reduced public health spending, and increased pressure on healthcare systems.
+
+* It is positive to see that in the year 2020, all countries are above 70 years, however not all have the same GDP levels again supporting the non linear relationship and the existence of other variables.
+
+
+:::
